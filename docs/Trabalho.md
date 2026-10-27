@@ -38,13 +38,13 @@ A Tabela 1 apresenta o ambiente adotado para o projeto. Linux Mint 22.3 e Node.j
 | Navegador | Chromium | Solicitar a página, apresentar o formulário e enviar as credenciais. |
 | Servidor web | Node.js 24.20.0, módulo nativo `node:http` | Receber requisições e enviar respostas HTTP [6]. |
 | Servidor de aplicação | Mesmo processo Node.js, em JavaScript puro | Executar a busca do usuário e a verificação da senha. |
-| Acesso aos dados | Módulo nativo `node:fs/promises` | Ler o arquivo de usuários [7]. |
+| Acesso aos dados | Biblioteca `pg` | Consultar a tabela de usuários no PostgreSQL [7]. |
 | Verificação da senha | Módulo nativo `node:crypto` | Derivar e comparar a credencial [8]. |
-| Repositório | Arquivo local `backend/data/usuarios.json` | Conter os usuários previamente registrados. |
+| Repositório | Banco PostgreSQL, tabela `usuarios` | Conter os usuários previamente registrados. |
 
-Legenda: os papéis de servidor web e de aplicação pertencem a um único processo. O repositório não exige servidor de banco de dados.
+Legenda: os papéis de servidor web e de aplicação pertencem a um único processo. O PostgreSQL é um processo separado do servidor Node.js.
 
-A aplicação será organizada em duas pastas: `frontend/`, com `index.html`, e `backend/`, com `server.js` e `data/usuarios.json`. A execução será feita com `node backend/server.js`, a partir da raiz do projeto. O servidor escutará em `127.0.0.1`, porta `3000`, e a página será acessada por `http://127.0.0.1:3000/`.
+A aplicação será organizada em duas pastas: `frontend/`, com `index.html`, e `backend/`, com `server.js`, `schema.sql` e `seed.sql`. A execução será feita com `node backend/server.js`, a partir da raiz do projeto. O servidor escutará em `127.0.0.1`, porta `3000`, e a página será acessada por `http://127.0.0.1:3000/`.
 
 O ambiente projetado usará HTTP somente no acesso local. Não haverá publicação em rede ou configuração de HTTPS nesta solução. No processamento Web por HTTPS, a conexão também envolve TLS, conforme [4]. O acesso pelo endereço IP local dispensa a resolução de um nome por DNS [3].
 
@@ -60,12 +60,12 @@ No servidor, o tratamento seguirá esta sequência:
 
 1. O código receberá os trechos do corpo da requisição e, ao final da leitura, decodificará os campos com `URLSearchParams`.
 2. A aplicação verificará se há um único e-mail e uma única senha, ambos preenchidos. O e-mail será aparado e convertido para letras minúsculas; a senha será mantida exatamente como recebida.
-3. O código lerá `backend/data/usuarios.json` como texto UTF-8 e usará `JSON.parse` para obter a lista de usuários. A busca comparará o e-mail recebido com os e-mails registrados [7].
+3. O código consultará a tabela `usuarios` do PostgreSQL com uma consulta parametrizada pelo e-mail recebido [7].
 4. Se o usuário existir, a aplicação usará o salt e o hash armazenados para verificar a senha pelo procedimento do [item 2.3](#23-componentes-dados-e-comunicação).
 5. A aplicação montará uma resposta JSON com a identificação ou o erro correspondente, conforme a Tabela 4.
 6. O servidor enviará o status, o cabeçalho `Content-Type: application/json; charset=utf-8` e o corpo serializado com `JSON.stringify`. O frontend interpretará a resposta e exibirá uma mensagem de sucesso ou de erro junto ao formulário. A operação terminará nesse retorno [6].
 
-Somente a rota da página entregará um arquivo da interface. O arquivo de usuários não terá rota de acesso pelo navegador. A descrição acima define o processamento projetado; não representa um relato de testes executados.
+Somente a rota da página entregará um arquivo da interface. O banco de dados não terá rota de acesso pelo navegador. A descrição acima define o processamento projetado; não representa um relato de testes executados.
 
 ## 2. Arquitetura e desenho detalhado dos componentes
 
@@ -87,7 +87,7 @@ Os usuários estarão previamente registrados no arquivo de dados. Cadastro, ses
 
 **Responsável pela elaboração:** Enzo Machado. **Revisor designado:** Heitor Barbosa.
 
-A Figura 1 mostra a comunicação da solução. O navegador enviará requisições ao programa Node.js, que atenderá à interface e executará a autenticação [2, 6]. O acesso ao arquivo de usuários será feito pelo servidor [7].
+A Figura 1 mostra a comunicação da solução. O navegador enviará requisições ao programa Node.js, que atenderá à interface e executará a autenticação [2, 6]. O acesso à tabela de usuários será feito pelo servidor [7].
 
 **Figura 1. Arquitetura da aplicação.**
 
@@ -100,7 +100,7 @@ Formulário HTML <--- HTTP -------> backend/server.js
                                          |
                                          | leitura local
                                          v
-                                  backend/data/usuarios.json
+                                  PostgreSQL: tabela usuarios
 ```
 
 Legenda: a comunicação HTTP ocorrerá em `127.0.0.1:3000`; a leitura do arquivo ocorrerá no mesmo computador do servidor.
@@ -120,12 +120,12 @@ A Tabela 2 apresenta as responsabilidades dos componentes. As operações são f
 | Formulário HTML | E-mail e senha | Enviar POST para `/autenticar`. | Requisição ao servidor. |
 | Tratamento HTTP | Método, caminho e corpo | Entregar a página ou encaminhar as credenciais para `autenticar(email, senha)` [6]. | Resposta HTML ou JSON. |
 | Autenticação | E-mail e senha | Validar a entrada, buscar o usuário e verificar a senha. | Identificação ou erro. |
-| Consulta de usuários | E-mail | Ler o JSON e localizar o registro pelo e-mail [7]. | Registro ou ausência de usuário. |
+| Consulta de usuários | E-mail | Consultar o PostgreSQL por e-mail [7]. | Registro ou ausência de usuário. |
 | Comparação de senha | Senha, salt e hash | Derivar a senha recebida com scrypt e comparar os resultados [8]. | Verdadeiro ou falso. |
 
 Legenda: todas as operações do servidor pertencerão ao mesmo processo Node.js.
 
-O repositório será uma lista JSON com a estrutura da Tabela 3. O e-mail será único, aparado e armazenado em letras minúsculas. A identidade retornada ao cliente conterá apenas `id` e `email`.
+O repositório será a tabela `usuarios`, criada por `backend/schema.sql`, com a estrutura da Tabela 3. O e-mail será único, aparado e armazenado em letras minúsculas. A identidade retornada ao cliente conterá apenas `id` e `email`.
 
 **Tabela 3. Dados de cada usuário.**
 
@@ -138,7 +138,7 @@ O repositório será uma lista JSON com a estrutura da Tabela 3. O e-mail será 
 
 Legenda: `salt` e `hashSenha` serão utilizados somente no servidor.
 
-A senha será tratada com scrypt, disponível em `node:crypto`. O projeto adotará `N = 131072`, `r = 8` e `p = 1`, configuração indicada em [5], com saída de 64 bytes e limite `maxmem` de 256 MiB. Na preparação dos registros, o salt será gerado por `randomBytes(16)`. Na autenticação, a aplicação decodificará o salt, derivará a senha recebida com `scrypt` e comparará buffers de mesmo tamanho com `timingSafeEqual` [8]. A senha original não será armazenada no JSON nem incluída na resposta.
+A senha será tratada com scrypt, disponível em `node:crypto`. O projeto adotará `N = 131072`, `r = 8` e `p = 1`, configuração indicada em [5], com saída de 64 bytes e limite `maxmem` de 256 MiB. Na preparação dos registros, o salt será gerado por `randomBytes(16)`. Na autenticação, a aplicação decodificará o salt, derivará a senha recebida com `scrypt` e comparará buffers de mesmo tamanho com `timingSafeEqual` [8]. A senha original não será armazenada no banco nem incluída na resposta.
 
 O contrato será `POST /autenticar`, com corpo `application/x-www-form-urlencoded`. Exemplo de entrada: `email=usuario%40exemplo.com&senha=valor`. A Tabela 4 estabelece as respostas, usando os status HTTP descritos em [4].
 
@@ -165,7 +165,7 @@ Os fluxos atendem às decisões do Apêndice A [1] e utilizam os componentes e r
 - **Usuário inexistente:** a leitura dos dados termina, mas a busca não encontra o e-mail. Retorna `403` com erro de credenciais inválidas.
 - **Senha incorreta:** o usuário é encontrado, mas o resultado da derivação não corresponde ao hash registrado. Retorna o mesmo erro `403`.
 - **Entrada inválida:** falta algum campo, há campos repetidos ou um dos valores está vazio. Retorna `400` antes da consulta dos usuários.
-- **Falha interna:** o arquivo não pode ser lido, seu conteúdo não tem o formato esperado ou a verificação da senha falha por erro de processamento. Retorna `500`, sem expor detalhes internos ao cliente.
+- **Falha interna:** a consulta ao banco falha ou a verificação da senha falha por erro de processamento. Retorna `500`, sem expor detalhes internos ao cliente.
 
 Esses fluxos descrevem o comportamento projetado. A verificação de sua implementação não faz parte dos resultados apresentados neste documento.
 
@@ -185,6 +185,6 @@ Esses fluxos descrevem o comportamento projetado. A verificação de sua impleme
 
 [6] NODE.JS. **HTTP.** Documentação da linha 24.x. Disponível em: https://nodejs.org/docs/latest-v24.x/api/http.html. Acesso em: 26 out. 2026.
 
-[7] NODE.JS. **File system.** Documentação da linha 24.x. Disponível em: https://nodejs.org/docs/latest-v24.x/api/fs.html. Acesso em: 26 out. 2026.
+[7] NODE-POSTGRES. **Queries.** Disponível em: https://node-postgres.com/features/queries. Acesso em: 27 out. 2026.
 
 [8] NODE.JS. **Crypto.** Documentação da linha 24.x. Disponível em: https://nodejs.org/docs/latest-v24.x/api/crypto.html. Acesso em: 26 out. 2026.

@@ -3,10 +3,10 @@ const { readFile } = require('node:fs/promises');
 const { join } = require('node:path');
 const { scrypt, timingSafeEqual } = require('node:crypto');
 const { promisify } = require('node:util');
+const { Pool } = require('pg');
 
 const derivarSenha = promisify(scrypt);
 const arquivoPagina = join(__dirname, '..', 'frontend', 'index.html');
-const arquivoUsuarios = join(__dirname, 'data', 'usuarios.json');
 const parametrosScrypt = { N: 131072, r: 8, p: 1, maxmem: 256 * 1024 * 1024 };
 
 function responderJson(resposta, status, dados) {
@@ -36,23 +36,12 @@ async function lerCredenciais(requisicao) {
   return { email, senha };
 }
 
-async function buscarPorEmail(email, caminhoUsuarios) {
-  const conteudo = await readFile(caminhoUsuarios, 'utf8');
-  const usuarios = JSON.parse(conteudo);
-  if (!Array.isArray(usuarios)) throw new Error('O arquivo deve conter uma lista de usuários.');
-
-  for (const usuario of usuarios) {
-    if (
-      !usuario || typeof usuario.id !== 'string' || !usuario.id ||
-      typeof usuario.email !== 'string' || !usuario.email ||
-      typeof usuario.salt !== 'string' || !/^[a-f0-9]{32}$/i.test(usuario.salt) ||
-      typeof usuario.hashSenha !== 'string' || !/^[a-f0-9]{128}$/i.test(usuario.hashSenha)
-    ) {
-      throw new Error('Registro de usuário inválido.');
-    }
-  }
-
-  return usuarios.find((usuario) => usuario.email === email);
+async function buscarPorEmail(email, pool) {
+  const resultado = await pool.query(
+    'SELECT id, email, salt, hash_senha AS "hashSenha" FROM usuarios WHERE email = $1',
+    [email]
+  );
+  return resultado.rows[0];
 }
 
 async function compararSenha(senha, usuario) {
@@ -62,8 +51,8 @@ async function compararSenha(senha, usuario) {
   return timingSafeEqual(hashRecebido, hashRegistrado);
 }
 
-// O caminho opcional permite testar a API sem modificar os usuários do projeto.
-function criarServidor(caminhoUsuarios = arquivoUsuarios) {
+// O pool opcional permite testar a API sem acessar o banco de produção.
+function criarServidor(pool = new Pool({ connectionString: process.env.DATABASE_URL })) {
   return createServer(async (requisicao, resposta) => {
     const caminho = requisicao.url.split('?')[0];
 
@@ -93,7 +82,7 @@ function criarServidor(caminhoUsuarios = arquivoUsuarios) {
         return;
       }
 
-      const usuario = await buscarPorEmail(credenciais.email, caminhoUsuarios);
+      const usuario = await buscarPorEmail(credenciais.email, pool);
       if (!usuario || !(await compararSenha(credenciais.senha, usuario))) {
         responderJson(resposta, 403, { erro: 'Credenciais inválidas' });
         return;

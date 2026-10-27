@@ -6,7 +6,7 @@ Projetar uma aplicação Web que receba e-mail e senha, verifique o usuário, co
 
 A entrega será realizada em **27 de outubro de 2026**, em um único PDF preparado a partir de [Trabalho.md](Trabalho.md). O corpo terá duas seções: ambiente operacional e arquitetura com desenho detalhado dos componentes. As referências bibliográficas ficarão depois dessas seções.
 
-O frontend usará HTML puro, com envio pelo próprio formulário. O backend será escrito em JavaScript puro com Node.js, sem Express ou outros frameworks. Os usuários serão consultados em um arquivo JSON local, por meio dos recursos nativos do Node.js.
+O frontend usa HTML puro. O backend usa JavaScript com Node.js e a biblioteca `pg`, sem Express. Os usuários são consultados em uma tabela PostgreSQL.
 
 O escopo termina no retorno da identidade ou do erro. Não inclui cadastro, sessão, logout ou área protegida. Implementação, demonstração e slides não são entregas explicitamente exigidas no enunciado.
 

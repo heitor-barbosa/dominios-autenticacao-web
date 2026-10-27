@@ -1,36 +1,42 @@
 const { test, before, beforeEach, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { once } = require('node:events');
-const { mkdtemp, readFile, writeFile, rm } = require('node:fs/promises');
-const { tmpdir } = require('node:os');
-const { join } = require('node:path');
+const usuarioExemplo = {
+  id: '1',
+  email: 'usuario@exemplo.com',
+  salt: '1a8b7a615e6a2be755f00ede2309b4dd',
+  hashSenha: 'f55bf517893b8457a9d7a14930ffd99329467eaaafcc5be29216eefa8ce42f182347d21551face56bf2b5b6ddd4e7c485f7d0fdfb30150b93403118c0765a7ac',
+};
 const { criarServidor } = require('./server');
 
 let servidor;
 let endereco;
-let diretorio;
-let caminhoUsuarios;
-let dadosIniciais;
+let falhaBanco = false;
+let consultas = [];
+const pool = {
+  async query(sql, valores) {
+    consultas.push({ sql, valores });
+    if (falhaBanco) throw new Error('Banco indisponível');
+    return { rows: valores[0] === usuarioExemplo.email ? [usuarioExemplo] : [] };
+  },
+};
 
 before(async () => {
-  diretorio = await mkdtemp(join(tmpdir(), 'autenticacao-'));
-  caminhoUsuarios = join(diretorio, 'usuarios.json');
-  dadosIniciais = await readFile(join(__dirname, 'data', 'usuarios.json'), 'utf8');
-  servidor = criarServidor(caminhoUsuarios);
+  servidor = criarServidor(pool);
   servidor.listen(0, '127.0.0.1');
   await once(servidor, 'listening');
   endereco = `http://127.0.0.1:${servidor.address().port}`;
 });
 
-beforeEach(async () => {
-  await writeFile(caminhoUsuarios, dadosIniciais);
+beforeEach(() => {
+  falhaBanco = false;
+  consultas = [];
 });
 
 after(async () => {
   if (servidor?.listening) {
     await new Promise((resolve) => servidor.close(resolve));
   }
-  if (diretorio) await rm(diretorio, { recursive: true });
 });
 
 function enviarFormulario(campos) {
@@ -118,19 +124,18 @@ test('rotas inexistentes não permitem ler arquivos do servidor', async () => {
   }
 });
 
-test('falhas no repositório retornam erro genérico, sem expor os dados', async () => {
-  const registroInvalido = JSON.parse(dadosIniciais);
-  registroInvalido[0].hashSenha = 'hash-inválido';
-  for (const conteudo of ['JSON inválido', '{}', JSON.stringify(registroInvalido)]) {
-    await writeFile(caminhoUsuarios, conteudo);
-    const resposta = await enviarFormulario({
-      email: 'usuario@exemplo.com', senha: 'SenhaTeste123!',
-    });
-    assert.equal(resposta.status, 500);
-    assert.deepEqual(await resposta.json(), { erro: 'Falha no processamento' });
-  }
+test('a consulta ao PostgreSQL usa parâmetro para o e-mail', async () => {
+  const resposta = await enviarFormulario({
+    email: "' OR 1=1 --", senha: 'SenhaTeste123!',
+  });
+  assert.equal(resposta.status, 403);
+  assert.equal(consultas.length, 1);
+  assert.match(consultas[0].sql, /WHERE email = \$1/);
+  assert.deepEqual(consultas[0].valores, ["' or 1=1 --"]);
+});
 
-  await rm(caminhoUsuarios);
+test('falha na consulta ao PostgreSQL retorna erro genérico', async () => {
+  falhaBanco = true;
   const resposta = await enviarFormulario({
     email: 'usuario@exemplo.com', senha: 'SenhaTeste123!',
   });

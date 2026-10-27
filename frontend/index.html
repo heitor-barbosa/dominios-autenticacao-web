@@ -1,0 +1,195 @@
+﻿<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f6f8">
+  <title>Autenticação de usuários</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #172b3a;
+      background: #f4f6f8;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      display: grid;
+      min-height: 100vh;
+      margin: 0;
+      padding: 24px;
+      place-items: center;
+    }
+
+    main {
+      width: min(100%, 420px);
+      padding: 36px;
+      border: 1px solid #e1e7eb;
+      border-radius: 16px;
+      background: #fff;
+      box-shadow: 0 16px 40px rgb(23 43 58 / 8%);
+    }
+
+    .marca {
+      display: grid;
+      width: 44px;
+      height: 44px;
+      margin-bottom: 24px;
+      border-radius: 12px;
+      background: #e7f3ef;
+      color: #176b52;
+      font-size: 22px;
+      font-weight: 700;
+      place-items: center;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.6rem, 6vw, 1.9rem);
+      letter-spacing: -0.04em;
+    }
+
+    .introducao {
+      margin: 10px 0 28px;
+      color: #5d6d78;
+      line-height: 1.55;
+    }
+
+    form { display: grid; gap: 18px; }
+
+    label {
+      display: grid;
+      gap: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    input {
+      width: 100%;
+      min-height: 48px;
+      padding: 11px 13px;
+      border: 1px solid #cbd5db;
+      border-radius: 8px;
+      background: #fff;
+      color: inherit;
+      font: inherit;
+    }
+
+    input:focus-visible {
+      border-color: #176b52;
+      outline: 3px solid rgb(23 107 82 / 18%);
+      outline-offset: 1px;
+    }
+
+    button {
+      min-height: 48px;
+      margin-top: 4px;
+      border: 0;
+      border-radius: 8px;
+      background: #176b52;
+      color: #fff;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 650;
+    }
+
+    button:hover { background: #10583f; }
+    button:focus-visible { outline: 3px solid #78b49e; outline-offset: 3px; }
+
+    .mensagem {
+      margin: 0;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .mensagem[data-tipo="erro"] { background: #fff0ee; color: #9c3025; }
+    .mensagem[data-tipo="sucesso"] { background: #e7f3ef; color: #176b52; }
+    .nota {
+      margin: 22px 0 0;
+      color: #71808a;
+      font-size: 0.8rem;
+      line-height: 1.5;
+      text-align: center;
+    }
+
+    @media (max-width: 480px) {
+      body { padding: 16px; }
+      main { padding: 28px 22px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="marca" aria-hidden="true">A</div>
+    <h1>Acessar</h1>
+    <p class="introducao">Informe seu e-mail e sua senha para verificar suas credenciais.</p>
+
+    <form action="/autenticar" method="post">
+      <label for="email">
+        E-mail
+        <input id="email" name="email" type="email" autocomplete="username" required>
+      </label>
+
+      <label for="senha">
+        Senha
+        <input id="senha" name="senha" type="password" autocomplete="current-password" required>
+      </label>
+
+      <button type="submit">Entrar</button>
+    </form>
+
+    <p id="mensagem" class="mensagem" role="status" aria-live="polite" hidden></p>
+    <p class="nota">A verificação é feita pelo servidor da aplicação.</p>
+  </main>
+  <script>
+    const formulario = document.querySelector('form');
+    const mensagem = document.querySelector('#mensagem');
+    const botao = formulario.querySelector('button');
+
+    formulario.addEventListener('submit', async (evento) => {
+      evento.preventDefault();
+      mensagem.hidden = true;
+      botao.disabled = true;
+      botao.textContent = 'Verificando...';
+
+      try {
+        const resposta = await fetch(formulario.action, {
+          method: formulario.method,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams(new FormData(formulario))
+        });
+        const dados = await resposta.json();
+
+        if (resposta.ok) {
+          mensagem.dataset.tipo = 'sucesso';
+          mensagem.textContent = `Credenciais válidas. Identificação: ${dados.id} (${dados.email}).`;
+        } else {
+          mensagem.dataset.tipo = 'erro';
+          if (resposta.status === 400) {
+            mensagem.textContent = 'Informe um e-mail válido e preencha a senha.';
+          } else if (resposta.status === 403) {
+            mensagem.textContent = 'E-mail ou senha inválidos.';
+          } else {
+            mensagem.textContent = 'Não foi possível verificar as credenciais. Tente novamente.';
+          }
+        }
+      } catch {
+        mensagem.dataset.tipo = 'erro';
+        mensagem.textContent = 'Não foi possível conectar ao servidor. Tente novamente.';
+      }
+
+      mensagem.hidden = false;
+      botao.disabled = false;
+      botao.textContent = 'Entrar';
+    });
+  </script>
+</body>
+</html>
+
+

@@ -54,7 +54,7 @@ O ambiente projetado usará HTTP somente no acesso local. Não haverá publicaç
 
 Ao acessar a aplicação, o navegador abrirá uma conexão com o servidor local e enviará `GET /`. O programa identificará o método e o caminho da requisição, lerá `frontend/index.html` e responderá com status `200` e conteúdo `text/html; charset=utf-8`. O navegador interpretará o HTML e exibirá os campos de e-mail e senha e o botão de envio [2, 6].
 
-O formulário terá `method="post"`, `action="/autenticar"` e campos chamados `email` e `senha`. Ao enviá-lo, o navegador produzirá uma requisição `POST /autenticar` com conteúdo `application/x-www-form-urlencoded`. Não haverá JavaScript no frontend.
+O formulário terá `method="post"`, `action="/autenticar"` e campos chamados `email` e `senha`. O JavaScript do frontend enviará as credenciais em uma requisição `POST /autenticar` com conteúdo `application/x-www-form-urlencoded` e apresentará na página o resultado retornado pelo servidor.
 
 No servidor, o tratamento seguirá esta sequência:
 
@@ -63,7 +63,7 @@ No servidor, o tratamento seguirá esta sequência:
 3. O código lerá `backend/data/usuarios.json` como texto UTF-8 e usará `JSON.parse` para obter a lista de usuários. A busca comparará o e-mail recebido com os e-mails registrados [7].
 4. Se o usuário existir, a aplicação usará o salt e o hash armazenados para verificar a senha pelo procedimento do [item 2.3](#23-componentes-dados-e-comunicação).
 5. A aplicação montará uma resposta JSON com a identificação ou o erro correspondente, conforme a Tabela 4.
-6. O servidor enviará o status, o cabeçalho `Content-Type: application/json; charset=utf-8` e o corpo serializado com `JSON.stringify`. O navegador exibirá o JSON recebido. A operação terminará nesse retorno [6].
+6. O servidor enviará o status, o cabeçalho `Content-Type: application/json; charset=utf-8` e o corpo serializado com `JSON.stringify`. O frontend interpretará a resposta e exibirá uma mensagem de sucesso ou de erro junto ao formulário. A operação terminará nesse retorno [6].
 
 Somente a rota da página entregará um arquivo da interface. O arquivo de usuários não terá rota de acesso pelo navegador. A descrição acima define o processamento projetado; não representa um relato de testes executados.
 

@@ -40,11 +40,11 @@ A Tabela 1 apresenta o ambiente adotado para o projeto. Linux Mint 22.3 e Node.j
 | Servidor de aplicação | Mesmo processo Node.js, em JavaScript puro | Executar a busca do usuário e a verificação da senha. |
 | Acesso aos dados | Módulo nativo `node:fs/promises` | Ler o arquivo de usuários [7]. |
 | Verificação da senha | Módulo nativo `node:crypto` | Derivar e comparar a credencial [8]. |
-| Repositório | Arquivo local `data/usuarios.json` | Conter os usuários previamente registrados. |
+| Repositório | Arquivo local `backend/data/usuarios.json` | Conter os usuários previamente registrados. |
 
 Legenda: os papéis de servidor web e de aplicação pertencem a um único processo. O repositório não exige servidor de banco de dados.
 
-A organização prevista terá três arquivos principais: `public/index.html`, `server.js` e `data/usuarios.json`. A execução será feita com `node server.js`, a partir da raiz do projeto. O servidor escutará em `127.0.0.1`, porta `3000`, e a página será acessada por `http://127.0.0.1:3000/`.
+A aplicação será organizada em duas pastas: `frontend/`, com `index.html`, e `backend/`, com `server.js` e `data/usuarios.json`. A execução será feita com `node backend/server.js`, a partir da raiz do projeto. O servidor escutará em `127.0.0.1`, porta `3000`, e a página será acessada por `http://127.0.0.1:3000/`.
 
 O ambiente projetado usará HTTP somente no acesso local. Não haverá publicação em rede ou configuração de HTTPS nesta solução. No processamento Web por HTTPS, a conexão também envolve TLS, conforme [4]. O acesso pelo endereço IP local dispensa a resolução de um nome por DNS [3].
 
@@ -52,7 +52,7 @@ O ambiente projetado usará HTTP somente no acesso local. Não haverá publicaç
 
 **Responsável pela elaboração:** Enzo Machado. **Revisor designado:** Brenner Rodrigues.
 
-Ao acessar a aplicação, o navegador abrirá uma conexão com o servidor local e enviará `GET /`. O programa identificará o método e o caminho da requisição, lerá `public/index.html` e responderá com status `200` e conteúdo `text/html; charset=utf-8`. O navegador interpretará o HTML e exibirá os campos de e-mail e senha e o botão de envio [2, 6].
+Ao acessar a aplicação, o navegador abrirá uma conexão com o servidor local e enviará `GET /`. O programa identificará o método e o caminho da requisição, lerá `frontend/index.html` e responderá com status `200` e conteúdo `text/html; charset=utf-8`. O navegador interpretará o HTML e exibirá os campos de e-mail e senha e o botão de envio [2, 6].
 
 O formulário terá `method="post"`, `action="/autenticar"` e campos chamados `email` e `senha`. Ao enviá-lo, o navegador produzirá uma requisição `POST /autenticar` com conteúdo `application/x-www-form-urlencoded`. Não haverá JavaScript no frontend.
 
@@ -60,7 +60,7 @@ No servidor, o tratamento seguirá esta sequência:
 
 1. O código receberá os trechos do corpo da requisição e, ao final da leitura, decodificará os campos com `URLSearchParams`.
 2. A aplicação verificará se há um único e-mail e uma única senha, ambos preenchidos. O e-mail será aparado e convertido para letras minúsculas; a senha será mantida exatamente como recebida.
-3. O código lerá `data/usuarios.json` como texto UTF-8 e usará `JSON.parse` para obter a lista de usuários. A busca comparará o e-mail recebido com os e-mails registrados [7].
+3. O código lerá `backend/data/usuarios.json` como texto UTF-8 e usará `JSON.parse` para obter a lista de usuários. A busca comparará o e-mail recebido com os e-mails registrados [7].
 4. Se o usuário existir, a aplicação usará o salt e o hash armazenados para verificar a senha pelo procedimento do [item 2.3](#23-componentes-dados-e-comunicação).
 5. A aplicação montará uma resposta JSON com a identificação ou o erro correspondente, conforme a Tabela 4.
 6. O servidor enviará o status, o cabeçalho `Content-Type: application/json; charset=utf-8` e o corpo serializado com `JSON.stringify`. O navegador exibirá o JSON recebido. A operação terminará nesse retorno [6].
@@ -93,14 +93,14 @@ A Figura 1 mostra a comunicação da solução. O navegador enviará requisiçõ
 
 ```text
 Navegador                          Servidor Node.js
-Formulário HTML <--- HTTP -------> server.js
+Formulário HTML <--- HTTP -------> backend/server.js
                                   - entrega da página
                                   - autenticação
                                   - verificação da senha
                                          |
                                          | leitura local
                                          v
-                                  data/usuarios.json
+                                  backend/data/usuarios.json
 ```
 
 Legenda: a comunicação HTTP ocorrerá em `127.0.0.1:3000`; a leitura do arquivo ocorrerá no mesmo computador do servidor.
